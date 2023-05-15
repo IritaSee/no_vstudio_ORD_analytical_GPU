@@ -39,9 +39,9 @@ void edison_assign_params(int argc, char *argv[], param_t *p_param)
 
   // parameters from arguments
   for (int idx = 1; idx < argc; idx += 2) {
-    if (!strcasecmp(argv[idx], "-input_deck"))
+    if (!strcmp(argv[idx], "-input_deck"))
       strcpy(file_name, argv[idx + 1]);
-    else if (!strcasecmp(argv[idx], "-hill_file"))
+    else if (!strcmp(argv[idx], "-hill_file"))
       strcpy(p_param->hill_file, argv[idx + 1]);
   }  
 
@@ -56,34 +56,34 @@ void edison_assign_params(int argc, char *argv[], param_t *p_param)
   // and store each line to the buffer
   while ( is_default == false && fgets( buffer, 100, fp_inputdeck ) != NULL ) {
     sscanf( buffer, "%s %*s %s", key, value );
-    if (strcasecmp(key, "Celltype") == 0) {
+    if (strcmp(key, "Celltype") == 0) {
       p_param->celltype = strtod( value, NULL );
     }
-    else if (strcasecmp(key, "Is_Dutta") == 0) {
+    else if (strcmp(key, "Is_Dutta") == 0) {
       p_param->is_dutta = strtol( value, NULL, 10 );
     }
-    else if (strcasecmp(key, "Is_Using_Output") == 0) {
+    else if (strcmp(key, "Is_Using_Output") == 0) {
       p_param->is_using_output = strtol( value, NULL, 10 );
     }
-    else if (strcasecmp(key, "Basic_Cycle_Length") == 0) {
+    else if (strcmp(key, "Basic_Cycle_Length") == 0) {
       p_param->bcl = strtod( value, NULL );
     }
-    else if (strcasecmp(key, "Number_of_Pacing") == 0) {
+    else if (strcmp(key, "Number_of_Pacing") == 0) {
       p_param->pace_max = strtol( value, NULL, 10 );
     }
-    else if (strcasecmp(key, "Time_Step") == 0) {
+    else if (strcmp(key, "Time_Step") == 0) {
       p_param->dt = strtod( value, NULL );
     }
-    else if (strcasecmp(key, "Write_Step") == 0) {
+    else if (strcmp(key, "Write_Step") == 0) {
       p_param->dt_write = strtod( value, NULL );
     }
-    else if (strcasecmp(key, "Drug_Name") == 0) {
+    else if (strcmp(key, "Drug_Name") == 0) {
       strcpy( p_param->drug_name, value );
     }
-    else if (strcasecmp(key, "Inet_Vm_Threshold") == 0) {
+    else if (strcmp(key, "Inet_Vm_Threshold") == 0) {
       p_param->inet_vm_threshold = strtod( value, NULL );
     }
-    else if (strcasecmp(key, "Concentrations") == 0) {
+    else if (strcmp(key, "Concentrations") == 0) {
       strcpy( p_param->concs, "0," );
       strcat( p_param->concs, value );
     }
