@@ -1,0 +1,30 @@
+#ifndef CELL_HPP
+#define CELL_HPP
+
+#include <string>
+#include <vector>
+#include "../enums/enum_cell.hpp"
+
+class CvodeSolverUserData{
+public:
+	using ComputeRatesFunction = void (*)(double pVoi, double* pConstants, double* pRates, double* pStates, double* pAlgebraic);
+	double* CONSTANTS;
+	double* ALGEBRAIC;
+	CvodeSolverUserData(double* pConstants, double* pAlgebraic) {
+		CONSTANTS = pConstants;
+		ALGEBRAIC = pAlgebraic;
+	}
+	ComputeRatesFunction mComputeRates;
+};
+
+const static char GATES_HEADER[255] = " m j jp hf hs hsp";
+const static unsigned short GATES_INDICES[] = {4,2,6,0,8,7,};
+const static unsigned short GATES_SIZE = 6;
+extern unsigned short CONSTANTS_SIZE;
+extern unsigned short ALGEBRAIC_SIZE;
+extern unsigned short STATES_SIZE;
+extern std::vector<std::string> gates_name;
+void initConsts(double* CONSTANTS, double* STATES);
+void computeRates(double TIME, double* CONSTANTS, double* RATES, double* STATES, double* ALGEBRAIC);
+
+#endif
