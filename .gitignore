@@ -1,9 +1,9 @@
-.vs/
-.vscode/
+.vs/*
+.vscode/*
 *.exe
 *.out
-modules/
-result/.
+modules/*
+result/*
 *.exp
 *.lib
 *.pdb
