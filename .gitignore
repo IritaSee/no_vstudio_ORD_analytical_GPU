@@ -2,7 +2,7 @@
 .vscode/*
 *.exe
 *.out
-modules/*
+*.plt
 result/*
 *.exp
 *.lib
