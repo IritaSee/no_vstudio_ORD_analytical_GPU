@@ -14,14 +14,14 @@
 .PHONY: all, clean
 
 # Define the final program name
-PROGNAME := cell_sim.exe
+PROGNAME := cell_sim
 
 # Pre-processor flags to be used for includes (-I) and defines (-D) 
 CPPFLAGS := 
 
 # CXX to set the compiler
-CXX := g++.exe
-#CXX := nvcc
+#CXX := g++.exe
+CXX := nvcc
 
 # CXXFLAGS is used for C++ compilation options.
 #CXXFLAGS += -Wall -O0 -fpermissive -std=c++11
