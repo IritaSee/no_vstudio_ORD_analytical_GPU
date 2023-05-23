@@ -1,7 +1,5 @@
-#include <cuda_runtime.h>
 #include <iostream>
 
-using namespace std;
 // reference github.com/colina118/Multin-cleo
 
 __global__ void multiplyElements(int *a, int *b, int *c) {
@@ -46,7 +44,7 @@ int main() {
 
   // Print the results.
   for (int i = 0; i < size; i++) {
-    cout <<a[i]<<"x"<<b[i]<<"="<< c[i] << endl;
+    printf("%d x %d = %d\n",a[i],b[i],c[i]);
   }
 
   // Free the memory on the device.
