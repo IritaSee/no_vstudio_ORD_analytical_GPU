@@ -8,21 +8,24 @@
 #include <ctime>
 #include <iostream>
 
+#include <cuda_runtime.h>
+
 #include "mar_cell_MKII.hpp"
 
 #include "modules/globals.hpp"
 #include "modules/commons.hpp"
 
 
-
 clock_t START_TIMER;
 
 char buffer[255];
 
-drug_t get_IC50_data_from_file(const char* file_name);
+void get_IC50_data_from_file(const char* file_name);
 clock_t tic();
+drug_t ic50;
+drug_t *d_ic50;
 void toc(clock_t start = START_TIMER);
-void do_drug_sim_analytical(const double conc, std::array<double, 14> ic50, 
+void do_drug_sim_analytical(const double conc, double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
 double set_time_step(double TIME,
     double time_point,
@@ -49,10 +52,12 @@ int main()
 
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
-    drug_t ic50 = get_IC50_data_from_file(buffer);
-    if(ic50.size() == 0)
+    //drug_t ic50 = get_IC50_data_from_file(buffer);
+    int data_row = sizeof(ic50)/sizeof(ic50[0]);
+    get_IC50_data_from_file(buffer);
+    if(sizeof(ic50)/sizeof(ic50[0]) == 0)
         printf("Something problem with the IC50 file!\n");
-    else if(ic50.size() > 2000)
+    else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
 
     
@@ -61,12 +66,12 @@ int main()
     tic();
     unsigned short sample_id;
     for( sample_id = 0;
-        sample_id < ic50.size();
+        sample_id < data_row;
         sample_id ++ )
     { // begin sample loop
         printf("Sample_ID:%d \nData: ",
         sample_id );
-        
+
         for( const auto &it1 : ic50[sample_id] ){
         printf("%lf|", it1);
         }
@@ -81,8 +86,7 @@ int main()
         //            NULL, sample_id,
         //            p_cell, ode_solver, cvode_firsttime);
         
-        do_drug_sim_analytical(conc, ic50[sample_id], 
-			       NULL,sample_id,p_cell);
+        do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
 
         } // end concentration loop
 
@@ -95,19 +99,23 @@ int main()
     return 0;
 }
 
-drug_t get_IC50_data_from_file(const char* file_name)
+void get_IC50_data_from_file(const char* file_name)
 {
   FILE *fp_drugs;
-  drug_t ic50;
+  
   char *token;
-  std::array<double,14> temp_array;
-  unsigned short idx;
+  //std::array<double,14> temp_array; //make the d_ version as well?
+  double temp_array[1][14];
+  //unsigned short idx;
+  unsigned int idx;
 
   if( (fp_drugs = fopen(file_name, "r")) == NULL){
     printf("Cannot open file %s\n",
       file_name);
-    return ic50;
+    //return ic50;
   }
+
+  int count = 0;
 
   fgets(buffer, sizeof(buffer), fp_drugs); // skip header
   while( fgets(buffer, sizeof(buffer), fp_drugs) != NULL )
@@ -116,14 +124,21 @@ drug_t get_IC50_data_from_file(const char* file_name)
     idx = 0;
     while( token != NULL )
     { // begin data tokenizing
-      temp_array[idx++] = strtod(token, NULL);
+      temp_array[0][idx] = strtod(token, NULL);
       token = strtok(NULL, ",");
+      ic50[count][idx] = temp_array[0][idx];
+      idx=idx+1;
     } // end data tokenizing
-    ic50.push_back(temp_array);
+    //ic50.push_back(temp_array);
+    count = count+1;
   } // end line reading
 
   fclose(fp_drugs);
-  return ic50;
+  //copy the ic50 to GPU memory
+  cudaMalloc(&d_ic50,idx * sizeof(drug_t));
+  cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
+
+  //return ic50;
 }
 
 clock_t tic()
@@ -140,7 +155,7 @@ void toc(clock_t start)
 }
 
 
-void do_drug_sim_analytical(const double conc, std::array<double, 14> ic50, 
+void do_drug_sim_analytical(const double conc,double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
