@@ -89,7 +89,7 @@ int main()
         //do_drug_sim(conc, ic50[sample_id],
         //            NULL, sample_id,
         //            p_cell, ode_solver, cvode_firsttime);
-        
+        // TODO @IritaSee: paralelise this loop that takes each data 
         do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
 
         } // end concentration loop
