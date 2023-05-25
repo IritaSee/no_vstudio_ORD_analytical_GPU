@@ -45,6 +45,9 @@ int main()
     // variables for I/O
     FILE* fp_vm;
     FILE* fp_gate;
+    
+    //prepare memory slots for ic_50 
+    cudaMalloc(&d_ic50, sizeof(drug_t));
 
     unsigned short idx;
 
@@ -134,13 +137,13 @@ void get_IC50_data_from_file(const char* file_name)
   } // end line reading
 
   fclose(fp_drugs);
+
   //copy the ic50 to GPU memory
-  cudaMalloc(&d_ic50,idx * sizeof(drug_t));
+  printf("lines found: %d",idx);
   cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
 
   //return ic50;
 }
-
 clock_t tic()
 {
     return START_TIMER = clock();
