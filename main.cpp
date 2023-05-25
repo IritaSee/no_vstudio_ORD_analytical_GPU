@@ -56,7 +56,8 @@ int main()
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
     //drug_t ic50 = get_IC50_data_from_file(buffer);
-    int data_row = sizeof(ic50)/sizeof(ic50[0]);
+    //int data_row = sizeof(ic50)/sizeof(ic50[0]);
+    int data_row = 10;
     get_IC50_data_from_file(buffer);
     if(sizeof(ic50)/sizeof(ic50[0]) == 0)
         printf("Something problem with the IC50 file!\n");
@@ -139,7 +140,7 @@ void get_IC50_data_from_file(const char* file_name)
   fclose(fp_drugs);
 
   //copy the ic50 to GPU memory
-  printf("lines found: %d",idx);
+  printf("rows found: %d\n",idx);
   cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
 
   //return ic50;
