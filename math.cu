@@ -15,7 +15,7 @@ __global__ void multiplyElements(int *a, int *b, int *c) {
 
 int main() {
   // Declare the arrays on the host.
-  int size = 10;
+  int size = 1000; // the maximum for the data type
   int a[size], b[size], c[size];
 
   // Initialize the arrays.

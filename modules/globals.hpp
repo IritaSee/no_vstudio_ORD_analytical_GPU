@@ -16,6 +16,7 @@ struct mympi
 
 
 // data structure for IC50
-typedef std::vector< std::array<double,14> > drug_t;
+//typedef std::vector< std::array<double,14> > drug_t;
+typedef double drug_t[2000][14];
 
 #endif
