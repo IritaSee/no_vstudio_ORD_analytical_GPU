@@ -69,9 +69,31 @@ int main()
 
     tic();
     unsigned short sample_id;
-    for( sample_id = 0;
-        sample_id < data_row;
-        sample_id ++ )
+    // for(sample_id = 0;sample_id<data_row;sample_id ++ )
+    // { // begin sample loop
+    //     printf("Sample_ID:%d \nData: ",
+    //     sample_id );
+
+    //     for( const auto &it1 : ic50[sample_id] ){
+    //     printf("%lf|", it1);
+    //     }
+    //     printf("\n");
+        
+
+    //     for( const auto &conc: concs )
+    //     { // begin concentration loop
+
+    //     // execute main simulation function
+    //     //do_drug_sim(conc, ic50[sample_id],
+    //     //            NULL, sample_id,
+    //     //            p_cell, ode_solver, cvode_firsttime);
+    //     // TODO @IritaSee: paralelise this loop that takes each data 
+    //     do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
+
+    //     } // end concentration loop
+
+    // } // end sample loop
+    // toc();
     { // begin sample loop
         printf("Sample_ID:%d \nData: ",
         sample_id );
@@ -90,13 +112,12 @@ int main()
         //            NULL, sample_id,
         //            p_cell, ode_solver, cvode_firsttime);
         // TODO @IritaSee: paralelise this loop that takes each data 
-        do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
+        do_drug_sim_analytical<<<1,10>>>(conc, ic50[sample_id],NULL,sample_id,p_cell);
 
         } // end concentration loop
 
     } // end sample loop
     toc();
-
     // memory cleaning and finalize the program
     delete p_cell;
 
@@ -158,8 +179,8 @@ void toc(clock_t start)
         << std::endl;
 }
 
-
-void do_drug_sim_analytical(const double conc,double ic50[14], 
+// TODO: @IritaSee: parallelize this function:
+__global__void do_drug_sim_analytical(const double conc,double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;

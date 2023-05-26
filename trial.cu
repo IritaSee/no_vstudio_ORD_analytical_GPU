@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <cuda.h>
 __global__ void dkernel(){
-    printf("Hello Cuda\n");
+    int tid = threadIdx.x;
+    printf("Hello Cuda %d\n", tid);
+
 }
  // compile like usual c code (nvcc trial.cu -o trial) will create trial.exe
 int main(){
     //syntax:
     //[global or host void name]<<<kernel invocation, kernel threads>>>();
-    dkernel<<<1,10>>>(); //these are called kernels -> when called, are executed 32 times in parallel by 32 different CUDA threads, as opposed to only once like regular C functions.
+    dkernel<<<1,10>>>(); //these are called kernels -> when called, are executed 10 times in parallel by 10 different CUDA threads, 
+    // as opposed to only once like regular C functions.
     /*
     A kernel is defined using the __global__ declaration specifier and the number of CUDA threads 
     that execute that kernel for a given kernel call is specified using a new <<<...>>> execution
