@@ -25,7 +25,7 @@ clock_t tic();
 drug_t ic50;
 drug_t *d_ic50;
 void toc(clock_t start = START_TIMER);
-void do_drug_sim_analytical(const double conc, double ic50[14], 
+void do_drug_sim_analytical(double conc, double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
 double set_time_step(double TIME,
     double time_point,
@@ -50,8 +50,7 @@ int main()
     cudaMalloc(&d_ic50, sizeof(drug_t));
 
     unsigned short idx;
-
-    std::array<double, 4> concs = {0.};
+    std::array<double, 4> concs = {0.0, 33.0, 66.0, 99.0};
 
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
@@ -84,7 +83,7 @@ int main()
 
         for( const auto &conc: concs )
         { // begin concentration loop
-
+        printf("Current Concentration: %lf \n",conc);
         // execute main simulation function
         //do_drug_sim(conc, ic50[sample_id],
         //            NULL, sample_id,
@@ -159,7 +158,7 @@ void toc(clock_t start)
 }
 
 
-void do_drug_sim_analytical(const double conc,double ic50[14], 
+void do_drug_sim_analytical(double conc,double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
