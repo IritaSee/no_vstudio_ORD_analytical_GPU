@@ -157,7 +157,7 @@ __global__ void Calculate(){
 
         for( const auto &conc: concs )
         { // begin concentration loop
-
+        printf("Current Concentration: %lf \n",conc);
         // execute main simulation function
         //do_drug_sim(conc, ic50[sample_id],
         //            NULL, sample_id,
@@ -172,7 +172,7 @@ __global__ void Calculate(){
 }
 
 // TODO: @IritaSee: parallelize this function:
-__global__ void do_drug_sim_analytical(const double conc,double ic50[14], 
+__global__ void do_drug_sim_analytical(double conc[10],double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
