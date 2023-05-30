@@ -7,3 +7,5 @@
 *.lib
 *.pdb
 *.bak
+*.o
+cell_sim
