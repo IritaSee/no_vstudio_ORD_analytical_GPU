@@ -3,13 +3,15 @@
 __global__ void dkernel(){
     int t = threadIdx.x;
     int T = blockIdx.x;
-    printf(" tread index: %d  block index: %d\n",t,T);
+    printf("tread index: %d  block index: %d\n",t,T);
 }
  // compile like usual c code (nvcc trial.cu -o trial) will create trial.exe
 int main(){
     //syntax:
-    //[global or host void name]<<<block, thread per block>>>();
-    dkernel<<<3,10>>>(); //these are called kernels -> when called, are executed 32 times in parallel by 32 different CUDA threads, as opposed to only once like regular C functions.
+    //[global or host void name]<<<grid_dimension, block_dimension>>>();
+    int block_dim = 10; // how many threads are in one block
+    int grid_dim = 3; // hown many blocks are in one grid
+    dkernel<<<grid_dim,block_dim>>>(); //these are called kernels -> when called, are executed 32 times in parallel by 32 different CUDA threads, as opposed to only once like regular C functions.
     /*
     A kernel is defined using the __global__ declaration specifier and the number of CUDA threads 
     that execute that kernel for a given kernel call is specified using a new <<<...>>> execution
