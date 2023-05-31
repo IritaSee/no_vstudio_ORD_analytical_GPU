@@ -33,7 +33,7 @@ LDFLAGS  += -g
 # List the project' sources to compile or let the Makefile recognize
 # them for you using 'wildcard' function.
 #
-SOURCES	= $(wildcard *.cpp) $(wildcard **/*.cpp) main.cu
+SOURCES	= $(wildcard *.cpp) $(wildcard **/*.cpp)
 
 # List the project' headers or let the Makefile recognize
 # them for you using 'wildcard' function.

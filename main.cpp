@@ -25,12 +25,8 @@ clock_t tic();
 drug_t ic50;
 drug_t *d_ic50;
 void toc(clock_t start = START_TIMER);
-
-__global__ void Calculate();
-
-__global__ void do_drug_sim_analytical(const double conc, double ic50[14], 
+void do_drug_sim_analytical(double conc, double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
-
 double set_time_step(double TIME,
     double time_point,
     double max_time_step,
@@ -54,9 +50,7 @@ int main()
     cudaMalloc(&d_ic50, sizeof(drug_t));
 
     unsigned short idx;
-
-    //std::array<double, 4> concs = {0.};
-    double concs [10][4] = {0.0, 33.0, 66.0, 99.0}; 
+    std::array<double, 4> concs = {0.0, 33.0, 66.0, 99.0};
 
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
@@ -68,12 +62,42 @@ int main()
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
+
     
-    
-    Calculate<<<1,10>>>(); // loop to do calculation in each data is replaced by this func
-    
+    Cellmodel *p_cell = new mar_cell_MKII();
+
+    tic();
+    unsigned short sample_id;
+    for( sample_id = 0;
+        sample_id < data_row;
+        sample_id ++ )
+    { // begin sample loop
+        printf("Sample_ID:%d \nData: ",
+        sample_id );
+
+        for( const auto &it1 : ic50[sample_id] ){
+        printf("%lf|", it1);
+        }
+        printf("\n");
+        
+
+        for( const auto &conc: concs )
+        { // begin concentration loop
+        printf("Current Concentration: %lf \n",conc);
+        // execute main simulation function
+        //do_drug_sim(conc, ic50[sample_id],
+        //            NULL, sample_id,
+        //            p_cell, ode_solver, cvode_firsttime);
+        // TODO @IritaSee: paralelise this loop that takes each data 
+        do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
+
+        } // end concentration loop
+
+    } // end sample loop
+    toc();
+
     // memory cleaning and finalize the program
-    
+    delete p_cell;
 
     return 0;
 }
@@ -133,46 +157,8 @@ void toc(clock_t start)
         << std::endl;
 }
 
-__global__ void Calculate(){
-  
-  double concs[10][4];
 
-  // Get the thread ID.
-  int tid = threadIdx.x;
-
-  // Calculate the element index.
-  int sample_id = blockIdx.x * blockDim.x + tid;
-
-  Cellmodel *p_cell = new mar_cell_MKII();
-
-
-  tic();
-  printf("Sample_ID:%d \nData: ",sample_id );
-
-  for( const auto &it1 : ic50[sample_id] ){
-        printf("%lf|", it1);
-        }
-        printf("\n");
-        
-
-        for( const auto &conc: concs )
-        { // begin concentration loop
-
-        // execute main simulation function
-        //do_drug_sim(conc, ic50[sample_id],
-        //            NULL, sample_id,
-        //            p_cell, ode_solver, cvode_firsttime);
-        // TODO @IritaSee: paralelise this loop that takes each data 
-        do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
-
-        } // end concentration loop
-
-   toc();
-   delete p_cell;
-}
-
-// TODO: @IritaSee: parallelize this function:
-__global__ void do_drug_sim_analytical(const double conc,double ic50[14], 
+void do_drug_sim_analytical(double conc,double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
