@@ -30,7 +30,9 @@ double *d_concs[4];
 
 __global__ void toc(clock_t start = START_TIMER);
 
-__global__ void Calculate();
+Cellmodel *p_cell = new mar_cell_MKII();
+
+__global__ void Calculate(double d_ic50[14], double concs[4], Cellmodel p_cell);
 
 void do_drug_sim_analytical(const double conc, double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
@@ -58,7 +60,7 @@ int main()
     cudaMalloc(&d_ic50, sizeof(drug_t));
     //perpare memory slots for concentration
     cudaMalloc((void**)&d_concs, 4*sizeof(double)); 
-
+    cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice);
     unsigned short idx;
 
     snprintf(buffer, sizeof(buffer),
@@ -71,9 +73,8 @@ int main()
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
-    
-    
-    Calculate<<<1,10>>>(); // loop to do calculation in each data is replaced by this func
+
+    Calculate<<<1,data_row>>>(d_ic50, d_concs, p_cell ); // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
     
@@ -272,16 +273,10 @@ double set_time_step(double TIME,
     }
 }
 
-__global__ void Calculate(){
+__global__ void Calculate(double d_ic50[14], double concs[4], Cellmodel p_cell ){
   
   // Get the thread ID.
-  int tid = threadIdx.x;
-
-  // Calculate the element index.
-  int sample_id = blockIdx.x * blockDim.x + tid;
-
-  Cellmodel *p_cell = new mar_cell_MKII();
-
+  int sample_id = threadIdx.x;
 
   //tic();
   printf("Sample_ID:%d \nData: ",sample_id );
@@ -299,7 +294,7 @@ __global__ void Calculate(){
         //            NULL, sample_id,
         //            p_cell, ode_solver, cvode_firsttime);
         // TODO @IritaSee: paralelise this loop that takes each data 
-        do_drug_sim_analytical(conc, ic50[sample_id],NULL,sample_id,p_cell);
+        do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
 
         } // end concentration loop
 
