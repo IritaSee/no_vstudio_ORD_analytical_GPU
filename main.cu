@@ -31,8 +31,39 @@ double *d_concs[4];
 __global__ void toc(clock_t start = START_TIMER);
 
 Cellmodel *p_cell = new mar_cell_MKII();
+Cellmodel *d_p_cell = new mar_cell_MKII();
 
-__global__ void Calculate(double d_ic50[14], double concs[4], Cellmodel p_cell);
+//__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
+__global__ void Calculate(double d_ic50[11][14], double *concs[4], Cellmodel *p_cell ){
+  
+  // Get the thread ID.
+  int sample_id = threadIdx.x;
+  printf("doing calculation loop....\n");
+  //tic();
+  printf("Sample_ID:%d \nData: ",sample_id );
+
+  for( const auto &it1 : d_ic50[sample_id] ){
+        printf("%lf|", it1);
+        }
+
+        printf("\n");
+        
+        // for( const auto &conc: concs )
+        // { // begin concentration loop
+        // printf("Current Concentration: %lf  ",conc);
+        // // execute main simulation function
+        // //do_drug_sim(conc, ic50[sample_id],
+        // //            NULL, sample_id,
+        // //            p_cell, ode_solver, cvode_firsttime);
+        // // TODO @IritaSee: paralelise this loop that takes each data 
+        // do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
+
+        // } // end concentration loop
+
+   //toc();
+   delete p_cell;
+}
+
 
 void do_drug_sim_analytical(const double conc, double ic50[14], 
 const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
@@ -58,9 +89,12 @@ int main()
     
     //prepare memory slots for ic_50 
     cudaMalloc(&d_ic50, sizeof(drug_t));
-    //perpare memory slots for concentration
+    //perpare memory slots for concentration and copy it to the just created mem slots
     cudaMalloc((void**)&d_concs, 4*sizeof(double)); 
     cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice);
+    //prepare memory slots for p_cell and copy it
+    cudaMalloc((void**)d_p_cell, sizeof(Cellmodel));
+    cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
     unsigned short idx;
 
     snprintf(buffer, sizeof(buffer),
@@ -73,8 +107,9 @@ int main()
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
-
-    Calculate<<<1,data_row>>>(d_ic50, d_concs, p_cell ); // loop to do calculation in each data is replaced by this func
+    printf("test\n");
+    Calculate<<<1,data_row>>>(ic50, d_concs, d_p_cell ); 
+    // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
     
@@ -85,6 +120,7 @@ int main()
 void get_IC50_data_from_file(const char* file_name)
 {
   FILE *fp_drugs;
+  printf("Reading the data....\n");
   
   char *token;
   //std::array<double,14> temp_array; //make the d_ version as well?
@@ -124,6 +160,7 @@ void get_IC50_data_from_file(const char* file_name)
 
   //return ic50;
 }
+
 // timer section
 // clock_t tic()
 // {
@@ -273,31 +310,3 @@ double set_time_step(double TIME,
     }
 }
 
-__global__ void Calculate(double d_ic50[14], double concs[4], Cellmodel p_cell ){
-  
-  // Get the thread ID.
-  int sample_id = threadIdx.x;
-
-  //tic();
-  printf("Sample_ID:%d \nData: ",sample_id );
-
-  for( const auto &it1 : d_ic50[sample_id] ){
-        printf("%lf|", it1);
-        }
-        printf("\n");
-        
-        for( const auto &conc: concs )
-        { // begin concentration loop
-        printf("Current Concentration: %lf  ",conc);
-        // execute main simulation function
-        //do_drug_sim(conc, ic50[sample_id],
-        //            NULL, sample_id,
-        //            p_cell, ode_solver, cvode_firsttime);
-        // TODO @IritaSee: paralelise this loop that takes each data 
-        do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
-
-        } // end concentration loop
-
-   //toc();
-   delete p_cell;
-}
