@@ -28,13 +28,13 @@ drug_t ic50;
 drug_t *d_ic50;
 double *d_concs[4];
 
-__global__ void toc(clock_t start = START_TIMER);
+// __global__ void toc(clock_t start = START_TIMER);
 
 Cellmodel *p_cell = new mar_cell_MKII();
 Cellmodel *d_p_cell = new mar_cell_MKII();
 
 //__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
-__global__ void Calculate(double d_ic50[11][14], double *concs[4], Cellmodel *p_cell ){
+__global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   
   // Get the thread ID.
   int sample_id = threadIdx.x;
@@ -108,7 +108,7 @@ int main()
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("test\n");
-    Calculate<<<1,data_row>>>(ic50, d_concs, d_p_cell ); 
+    Calculate<<<1,data_row>>>(d_ic50, d_concs, d_p_cell ); 
     // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
