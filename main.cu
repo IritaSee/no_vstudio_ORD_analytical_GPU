@@ -26,6 +26,9 @@ void get_IC50_data_from_file(const char* file_name);
 clock_t tic();
 drug_t ic50;
 drug_t *d_ic50;
+// double ic50[2000][14];
+// double *d_ic50[2000][14];
+
 double *d_concs[4];
 
 // __global__ void toc(clock_t start = START_TIMER);
@@ -38,29 +41,30 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   
   // Get the thread ID.
   int sample_id = threadIdx.x;
-  printf("doing calculation loop....\n");
+  int conc_idx = blockIdx.x;
+  //printf("doing calculation loop....\n");
   //tic();
-  printf("Sample_ID:%d \nData: ",sample_id );
+  printf("concentration: %d -> value: %lf\n",conc_idx, &concs[conc_idx]);
+  printf("Sample_ID: %d\n",sample_id );
 
-  for( const auto &it1 : d_ic50[sample_id] ){
-        printf("%lf|", it1);
-        }
-
-        printf("\n");
-        
+  // for( const auto &it1 : d_ic50[sample_id] ){
+  //       printf("%lf|", it1);
+  //       }
+  
+  //       printf("\n");
         // for( const auto &conc: concs )
         // { // begin concentration loop
-        // printf("Current Concentration: %lf  ",conc);
+        // printf("Current Concentration: %lf  ",concs[a]);
         // // execute main simulation function
         // //do_drug_sim(conc, ic50[sample_id],
         // //            NULL, sample_id,
         // //            p_cell, ode_solver, cvode_firsttime);
         // // TODO @IritaSee: paralelise this loop that takes each data 
-        // do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
+        // //do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
 
         // } // end concentration loop
 
-   //toc();
+  //  toc();
    delete p_cell;
 }
 
@@ -107,8 +111,10 @@ int main()
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
-    printf("test\n");
-    Calculate<<<1,data_row>>>(d_ic50, d_concs, d_p_cell ); 
+    printf("start calculation....\n");
+    Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  //concentration loop fails so i loop it altogether
+    cudaDeviceSynchronize();
+    
     // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
