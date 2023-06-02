@@ -44,7 +44,16 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   int conc_idx = blockIdx.x;
   //printf("doing calculation loop....\n");
   //tic();
-  printf("concentration: %d -> value: %lf\n",conc_idx, &concs[conc_idx]);
+
+  //for now, we hard code the concs
+  double h_concs[4] = {0.0, 33.0, 66.0, 99.0};
+
+  //memset(h_concs, -1, sizeof(h_concs));
+  //printf("%lf", h_concs[1]);
+  // cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
+  // cudaMemcpy(h_concs, concs, 4*sizeof(double), cudaMemcpyDeviceToHost);
+
+  printf("concentration: %d -> value: %lf\n",conc_idx, h_concs[conc_idx]);
   printf("Sample_ID: %d\n",sample_id );
 
   // for( const auto &it1 : d_ic50[sample_id] ){
@@ -60,7 +69,9 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
         // //            NULL, sample_id,
         // //            p_cell, ode_solver, cvode_firsttime);
         // // TODO @IritaSee: paralelise this loop that takes each data 
-        // //do_drug_sim_analytical(conc, d_ic50[sample_id],NULL,sample_id,p_cell);
+        
+        //WARNING: concs still hard coded
+        do_drug_sim_analytical(h_concs[conc_idx], d_ic50[sample_id],NULL,sample_id,p_cell);
 
         // } // end concentration loop
 
@@ -112,7 +123,8 @@ int main()
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("start calculation....\n");
-    Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  //concentration loop fails so i loop it altogether
+    Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
+    //concentration loop fails so i loop it altogether
     cudaDeviceSynchronize();
     
     // loop to do calculation in each data is replaced by this func
