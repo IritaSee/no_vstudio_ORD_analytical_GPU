@@ -266,7 +266,7 @@ int main()
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("start calculation....\n");
-    Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
+    //Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     cudaDeviceSynchronize();
