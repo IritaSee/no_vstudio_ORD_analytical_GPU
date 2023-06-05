@@ -30,6 +30,9 @@ CXX := nvcc
 # LDFLAGS is used for linker (-g enables debug symbols)
 LDFLAGS  += -g
 
+# Add LDFLAGS for parallel compiling (since it has more than 1 global)
+LDFLAGS += -rdc=true
+
 # List the project' sources to compile or let the Makefile recognize
 # them for you using 'wildcard' function.
 #

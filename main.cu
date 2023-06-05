@@ -20,10 +20,23 @@ clock_t START_TIMER;
 
 char buffer[255];
 double concs [4] = {0.0, 33.0, 66.0, 99.0};
+// timer section
+clock_t tic()
+{
+    return START_TIMER = clock();
+}
+
+void toc(clock_t start)
+{
+    std::cout
+        << "Elapsed time: "
+        << (clock() - start) / (double)CLOCKS_PER_SEC << "s"
+        << std::endl;
+}
 
 
 void get_IC50_data_from_file(const char* file_name);
-clock_t tic();
+
 drug_t ic50;
 drug_t *d_ic50;
 // double ic50[2000][14];
@@ -36,6 +49,140 @@ double *d_concs[4];
 Cellmodel *p_cell = new mar_cell_MKII();
 Cellmodel *d_p_cell = new mar_cell_MKII();
 
+double set_time_step(double TIME,
+    double time_point,
+    double max_time_step,
+    double* CONSTANTS,
+    double* RATES,
+    double* STATES,
+    double* ALGEBRAIC) {
+    double time_step = 0.005;
+
+    if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
+        //printf("TIME <= time_point ms\n");
+        return time_step;
+        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
+    }
+    else {
+        //printf("TIME > time_point ms\n");
+        if (std::abs(RATES[V] * time_step) <= 0.2) {//Slow changes in V
+            //printf("dV/dt <= 0.2\n");
+            time_step = std::abs(0.8 / RATES[V]);
+            //Make sure time_step is between 0.005 and max_time_step
+            if (time_step < 0.005) {
+                time_step = 0.005;
+            }
+            else if (time_step > max_time_step) {
+                time_step = max_time_step;
+            }
+            //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+        }
+        else if (std::abs(RATES[V] * time_step) >= 0.8) {//Fast changes in V
+            //printf("dV/dt >= 0.8\n");
+            time_step = std::abs(0.2 / RATES[V]);
+            while (std::abs(RATES[V] * time_step) >= 0.8 && 0.005 < time_step && time_step < max_time_step) {
+                time_step = time_step / 10.0;
+                //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+            }
+        }
+        return time_step;
+    }
+}
+
+//case 1: we make this function, global
+void do_drug_sim_analytical(double conc,double ic50[14],const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
+{
+  double tcurr = 0.0, dt = 0.005, dt_set, tmax;
+  double max_time_step = 1.0, time_point = 25.0;
+
+  // files for storing results
+  // time-series result
+  FILE *fp_vm, *fp_inet, *fp_gate;
+
+  // features
+  double inet, qnet;
+
+  // looping counter
+  unsigned short idx;
+  
+  // simulation parameters
+  double dtw = 2.0;
+  const char *drug_name = "bepridil";
+  const double bcl = 2000;
+  const double inet_vm_threshold = -88.0;
+  const unsigned short pace_max = 10;
+  const unsigned short celltype = 0.;
+  const unsigned short last_pace_print = 3;
+  const unsigned short last_drug_check_pace = 250;
+  const unsigned int print_freq = (1./dt) * dtw;
+  unsigned short pace_count = 0;
+  unsigned short pace_steepest = 0;
+
+  // apply some cell initialization
+  p_cell->initConsts();
+  //p_cell->initConsts( celltype, conc, ic50.data());
+  p_cell->CONSTANTS[stim_period] = bcl;
+
+  // generate file for time-series output
+  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_vmcheck_smp%d.plt", 
+            drug_name, conc, sample_id );
+  fp_vm = fopen( buffer, "w" );
+  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_gates_smp%d.plt",
+            drug_name, conc, sample_id);
+  fp_gate = fopen(buffer, "w");
+
+  fprintf(fp_vm, "%s %s\n", "Time", "Vm");
+  fprintf(fp_gate, "Time %s\n", p_cell->GATES_HEADER);
+
+  tmax = pace_max * bcl;
+
+  while (tcurr < tmax) {
+    dt_set = set_time_step(tcurr,
+        		   time_point,
+		           max_time_step,
+  		         p_cell->CONSTANTS,
+		           p_cell->RATES,
+			         p_cell->STATES,
+		           p_cell->ALGEBRAIC);
+
+    //Compute all rates at tcurr
+    p_cell->computeRates(tcurr,
+		          p_cell->CONSTANTS,
+            	p_cell->RATES,
+		          p_cell->STATES,
+            	p_cell->ALGEBRAIC);
+
+    //Compute the correct/accepted time step
+    if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
+      dt = dt_set;
+    }
+    else {
+      dt = (floor(tcurr / bcl) + 1) * bcl - tcurr;
+    }
+
+    //Compute the analytical solution
+    p_cell->solveAnalytical(dt);
+    
+    //=============//
+    //Print results//
+    //=============//
+    fprintf(fp_vm, "%lf %lf\n", tcurr, p_cell->STATES[V]);
+    fprintf(fp_gate, "%lf ",tcurr);
+    for(idx = 0; idx < p_cell->gates_size; idx++){
+      fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
+    }
+    fprintf(fp_gate, "\n");
+  
+    //Next time step
+    tcurr = tcurr + dt;
+  }
+
+  // clean the memories
+  fclose(fp_vm);
+  fclose(fp_gate);
+}
+
+
 //__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
 __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   
@@ -43,7 +190,7 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   int sample_id = threadIdx.x;
   int conc_idx = blockIdx.x;
   //printf("doing calculation loop....\n");
-  //tic();
+  
 
   //for now, we hard code the concs
   double h_concs[4] = {0.0, 33.0, 66.0, 99.0};
@@ -71,17 +218,13 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
         // // TODO @IritaSee: paralelise this loop that takes each data 
         
         //WARNING: concs still hard coded
-        do_drug_sim_analytical(h_concs[conc_idx], d_ic50[sample_id],NULL,sample_id,p_cell);
+        //do_drug_sim_analytical(h_concs[conc_idx], *d_ic50[sample_id], NULL, sample_id, p_cell);
 
         // } // end concentration loop
 
-  //  toc();
+   
    delete p_cell;
 }
-
-
-void do_drug_sim_analytical(const double conc, double ic50[14], 
-const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
 
 double set_time_step(double TIME,
     double time_point,
@@ -111,7 +254,7 @@ int main()
     cudaMalloc((void**)d_p_cell, sizeof(Cellmodel));
     cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
     unsigned short idx;
-
+    tic();
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
     //drug_t ic50 = get_IC50_data_from_file(buffer);
@@ -124,9 +267,10 @@ int main()
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("start calculation....\n");
     Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
+    // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     cudaDeviceSynchronize();
-    
+    toc(START_TIMER);
     // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
@@ -178,153 +322,3 @@ void get_IC50_data_from_file(const char* file_name)
 
   //return ic50;
 }
-
-// timer section
-// clock_t tic()
-// {
-//     return START_TIMER = clock();
-// }
-
-// void toc(clock_t start)
-// {
-//     std::cout
-//         << "Elapsed time: "
-//         << (clock() - start) / (double)CLOCKS_PER_SEC << "s"
-//         << std::endl;
-// }
-
-
-void do_drug_sim_analytical(double conc[10],double ic50[14], 
-const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
-{
-  double tcurr = 0.0, dt = 0.005, dt_set, tmax;
-  double max_time_step = 1.0, time_point = 25.0;
-
-  // files for storing results
-  // time-series result
-  FILE *fp_vm, *fp_inet, *fp_gate;
-
-  // features
-  double inet, qnet;
-
-  // looping counter
-  unsigned short idx;
-  
-  // simulation parameters
-  double dtw = 2.0;
-  const char *drug_name = "bepridil";
-  const double bcl = 2000;
-  const double inet_vm_threshold = -88.0;
-  const unsigned short pace_max = 10;
-  const unsigned short celltype = 0.;
-  const unsigned short last_pace_print = 3;
-  const unsigned short last_drug_check_pace = 250;
-  const unsigned int print_freq = (1./dt) * dtw;
-  unsigned short pace_count = 0;
-  unsigned short pace_steepest = 0;
-
-  // apply some cell initialization
-  p_cell->initConsts();
-  //p_cell->initConsts( celltype, conc, ic50.data());
-  p_cell->CONSTANTS[stim_period] = bcl;
-
-  // generate file for time-series output
-  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_vmcheck_smp%d.plt", 
-            drug_name, conc, sample_id );
-  fp_vm = fopen( buffer, "w" );
-  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_gates_smp%d.plt",
-            drug_name, conc, sample_id);
-  fp_gate = fopen(buffer, "w");
-
-  fprintf(fp_vm, "%s %s\n", "Time", "Vm");
-  fprintf(fp_gate, "Time %s\n", p_cell->GATES_HEADER);
-
-  tmax = pace_max * bcl;
-
-  while (tcurr < tmax) {
-    dt_set = set_time_step(tcurr,
-        		   time_point,
-		           max_time_step,
-  		           p_cell->CONSTANTS,
-		           p_cell->RATES,
-			   p_cell->STATES,
-		           p_cell->ALGEBRAIC);
-
-    //Compute all rates at tcurr
-    p_cell->computeRates(tcurr,
-		         p_cell->CONSTANTS,
-            		 p_cell->RATES,
-		         p_cell->STATES,
-            		 p_cell->ALGEBRAIC);
-
-    //Compute the correct/accepted time step
-    if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
-      dt = dt_set;
-    }
-    else {
-      dt = (floor(tcurr / bcl) + 1) * bcl - tcurr;
-    }
-
-    //Compute the analytical solution
-    p_cell->solveAnalytical(dt);
-    
-    //=============//
-    //Print results//
-    //=============//
-    fprintf(fp_vm, "%lf %lf\n", tcurr, p_cell->STATES[V]);
-    fprintf(fp_gate, "%lf ",tcurr);
-    for(idx = 0; idx < p_cell->gates_size; idx++){
-      fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
-    }
-    fprintf(fp_gate, "\n");
-  
-    //Next time step
-    tcurr = tcurr + dt;
-  }
-
-  // clean the memories
-  fclose(fp_vm);
-  fclose(fp_gate);
-}
-
-
-double set_time_step(double TIME,
-    double time_point,
-    double max_time_step,
-    double* CONSTANTS,
-    double* RATES,
-    double* STATES,
-    double* ALGEBRAIC) {
-    double time_step = 0.005;
-
-    if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
-        //printf("TIME <= time_point ms\n");
-        return time_step;
-        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
-    }
-    else {
-        //printf("TIME > time_point ms\n");
-        if (std::abs(RATES[V] * time_step) <= 0.2) {//Slow changes in V
-            //printf("dV/dt <= 0.2\n");
-            time_step = std::abs(0.8 / RATES[V]);
-            //Make sure time_step is between 0.005 and max_time_step
-            if (time_step < 0.005) {
-                time_step = 0.005;
-            }
-            else if (time_step > max_time_step) {
-                time_step = max_time_step;
-            }
-            //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
-        }
-        else if (std::abs(RATES[V] * time_step) >= 0.8) {//Fast changes in V
-            //printf("dV/dt >= 0.8\n");
-            time_step = std::abs(0.2 / RATES[V]);
-            while (std::abs(RATES[V] * time_step) >= 0.8 && 0.005 < time_step && time_step < max_time_step) {
-                time_step = time_step / 10.0;
-                //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
-            }
-        }
-        return time_step;
-    }
-}
-
