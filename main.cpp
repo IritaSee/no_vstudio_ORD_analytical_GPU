@@ -45,7 +45,7 @@ int main()
 
     unsigned short idx;
 
-    std::array<double, 4> concs = {0.};
+    std::array<double, 4> concs = {0.0, 33.0, 66.0, 99.0};
 
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
