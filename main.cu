@@ -10,7 +10,7 @@
 
 #include <cuda_runtime.h>
 
-#include "mar_cell_MKII.hpp"
+#include "mar_cell_MKII.cuh"
 
 #include "modules/globals.hpp"
 #include "modules/commons.hpp"
@@ -90,7 +90,7 @@ double set_time_step(double TIME,
 }
 
 //case 1: we make this function, global
-void do_drug_sim_analytical(double conc,double ic50[14],const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
+__global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
   double max_time_step = 1.0, time_point = 25.0;
@@ -218,7 +218,7 @@ __global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
         // // TODO @IritaSee: paralelise this loop that takes each data 
         
         //WARNING: concs still hard coded
-        //do_drug_sim_analytical(h_concs[conc_idx], *d_ic50[sample_id], NULL, sample_id, p_cell);
+        do_drug_sim_analytical<<<1,1>>>(h_concs[conc_idx], *d_ic50[sample_id], NULL, sample_id, p_cell);
 
         // } // end concentration loop
 

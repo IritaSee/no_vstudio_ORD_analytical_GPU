@@ -42,6 +42,7 @@ SOURCES	= $(wildcard *.cpp) $(wildcard **/*.cpp) main.cu
 # them for you using 'wildcard' function.
 #
 HEADERS	= $(wildcard *.hpp) $(wildcard **/*.hpp)
+HEADERS += $(wildcard *.cuh) 
 
 # Construct the list of object files based on source files using
 # simple extension substitution.
