@@ -22,12 +22,14 @@ char buffer[255];
 double concs [4] = {0.0, 33.0, 66.0, 99.0};
 // timer section
 clock_t tic()
+/* start timer*/
 {
     return START_TIMER = clock();
 }
 
 void toc(clock_t start)
 {
+  /*stop timer*/
     std::cout
         << "Elapsed time: "
         << (clock() - start) / (double)CLOCKS_PER_SEC << "s"
@@ -49,7 +51,12 @@ double *d_concs[4];
 Cellmodel *p_cell = new mar_cell_MKII();
 Cellmodel *d_p_cell = new mar_cell_MKII();
 
-double set_time_step(double TIME,
+double set_time_step(
+  /*
+  as 'adaptive' solver, we need the time step to change in the middle of 
+  the process
+  */
+    double TIME,
     double time_point,
     double max_time_step,
     double* CONSTANTS,
@@ -89,9 +96,12 @@ double set_time_step(double TIME,
     }
 }
 
-//case 1: we make this function, global
 __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 {
+
+  /*
+  do drug effect simulation, loop will be replaced with kernel loops
+  */
   double tcurr = 0.0, dt = 0.005, dt_set, tmax;
   double max_time_step = 1.0, time_point = 25.0;
 
@@ -184,8 +194,12 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 
 
 //__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
-__global__ void Calculate(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
+__global__ void Concentration(drug_t *d_ic50, double *concs[4], Cellmodel *p_cell ){
   
+  /*
+  uses block and thread in CUDA to replace concentration loop
+  */
+
   // Get the thread ID.
   int sample_id = threadIdx.x;
   int conc_idx = blockIdx.x;
@@ -266,7 +280,7 @@ int main()
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("start calculation....\n");
-    Calculate<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
+    Concentration<<<4,data_row>>>(d_ic50, d_concs, d_p_cell );  
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     cudaDeviceSynchronize();
