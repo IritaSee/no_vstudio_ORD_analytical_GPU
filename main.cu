@@ -295,6 +295,8 @@ int main()
 
 void get_IC50_data_from_file(const char* file_name)
 {
+  /*get IC50 data from a file*/
+  /*caution: keep it host function!*/
   FILE *fp_drugs;
   printf("Reading the data....\n");
   
