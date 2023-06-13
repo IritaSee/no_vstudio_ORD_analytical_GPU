@@ -273,7 +273,7 @@ drug_t *d_ic50;
 // double *d_ic50[2000][14];
 
 double *d_concs[4];
-double *d_time_step;
+__device__ double *d_time_step;
 
 // __global__ void toc(clock_t start = START_TIMER);
 
@@ -297,7 +297,7 @@ __global__ void set_time_step(
     if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
         //printf("TIME <= time_point ms\n");
         //return time_step;
-        cudaMemcpy(d_time_step, &time_step, sizeof(double), cudaMemcpyHostToDevice);
+        memcpy(d_time_step, &time_step, sizeof(double));
         __syncthreads(); //equivalent to break
         //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
     }
@@ -324,7 +324,7 @@ __global__ void set_time_step(
             }
         }
         // return time_step;
-        cudaMemcpy(d_time_step, &time_step, sizeof(double), cudaMemcpyHostToDevice);
+        memcpy(d_time_step, &time_step, sizeof(double));
     }
 }
 __global__ void solveAnalytical(double* CONSTANTS, double* RATES, double *STATES, double *ALGEBRAIC, double dt)
@@ -499,14 +499,16 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
   CONSTANTS[stim_period] = bcl;
 
   // generate file for time-series output
-  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_vmcheck_smp%d.plt", 
-            drug_name, conc, sample_id );
-  fp_vm = fopen( buffer, "w" );
-  snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_gates_smp%d.plt",
-            drug_name, conc, sample_id);
-  fp_gate = fopen(buffer, "w");
+  // snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_vmcheck_smp%d.plt", 
+  //           drug_name, conc, sample_id );
+  // fp_vm = fopen( buffer, "w" );
+  // snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_gates_smp%d.plt",
+  //           drug_name, conc, sample_id);
+  // fp_gate = fopen(buffer, "w");
+  printf("drug name: %s , concentration: %.2lf , sample id: %d \n", drug_name, conc, sample_id);
 
-  fprintf(fp_vm, "%s %s\n", "Time", "Vm");
+  // fprintf(fp_vm, "%s %s\n", "Time", "Vm");
+  //printf("Time: %s Vm: %s\n", "Time", "Vm");
   // fprintf(fp_gate, "Time %s\n", GATES_HEADER); //this is to write headers in results
 
   tmax = pace_max * bcl;
@@ -526,6 +528,8 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 		           RATES,
 			         STATES,
 		           ALGEBRAIC);
+              // cudaDeviceSynchronize();
+    printf("set time step\n");
 
     dt_set = *d_time_step;
 
@@ -535,6 +539,8 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
             	RATES,
 		          STATES,
             	ALGEBRAIC);
+              // cudaDeviceSynchronize();
+    printf("compute rates\n");
 
     //Compute the correct/accepted time step
     if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
@@ -546,24 +552,28 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 
     //Compute the analytical solution
     solveAnalytical<<<1,1>>>(CONSTANTS, RATES, STATES, ALGEBRAIC, dt);
+    printf("compute rates\n");
     
     //=============//
     //Print results//
     //=============//
-    fprintf(fp_vm, "%lf %lf\n", tcurr, STATES[V]);
-    fprintf(fp_gate, "%lf ",tcurr);
+    // fprintf(fp_vm, "%lf %lf\n", tcurr, STATES[V]);
+    // fprintf(fp_gate, "%lf ",tcurr);
+    printf("tcurr: %lf States[v]: %lf\n", tcurr, STATES[V]);
+    // printf("%lf \n \n",tcurr);    
     // for(idx = 0; idx < p_cell->gates_size; idx++){
     //   fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
     // }
-    fprintf(fp_gate, "\n");
+    // fprintf(fp_gate, "\n");
+    printf("\n");
   
     //Next time step
     tcurr = tcurr + dt;
   }
 
   // clean the memories
-  fclose(fp_vm);
-  fclose(fp_gate);
+  //fclose(fp_vm);
+  //fclose(fp_gate);
 }
 
 
