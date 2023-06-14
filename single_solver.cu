@@ -20,6 +20,10 @@ clock_t START_TIMER;
 
 char buffer[255];
 double concs [4] = {0.0, 33.0, 66.0, 99.0};
+// variables for I/O
+FILE* fp_vm;
+FILE* fp_gate;
+    
 // timer section
 clock_t tic()
 /* start timer*/
@@ -268,7 +272,7 @@ ALGEBRAIC[68] = 1.00000/(1.00000+( CONSTANTS[42]*CONSTANTS[43])/pow(STATES[15]+C
 }
 
 drug_t ic50;
-drug_t *d_ic50;
+__device__ drug_t *d_ic50;
 // double ic50[2000][14];
 // double *d_ic50[2000][14];
 
@@ -458,13 +462,13 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 
   // files for storing results
   // time-series result
-  FILE *fp_vm, *fp_inet, *fp_gate;
+  FILE *vfp_m, *fp_inet, *fp_gate;
 
   // features
   double inet, qnet;
 
   // looping counter
-  unsigned short idx;
+  unsigned short idx = 14;
   
   // simulation parameters
   double dtw = 2.0;
@@ -491,7 +495,11 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
   STATES = (double*)malloc((num_of_states)*sizeof(double));
   CONSTANTS = (double*)malloc((num_of_constants)*sizeof(double));
   ALGEBRAIC = (double*)malloc((num_of_algebraic)*sizeof(double));
-
+  printf("check data: \n");
+  for(int sample_index=0; sample_index<idx; sample_index++){
+        printf("%lf|", d_ic50[2][sample_index]);
+        }
+        printf("\n \n");
 
   // apply some cell initialization
   initConsts<<<1,1>>>(CONSTANTS, RATES, STATES);
@@ -505,9 +513,10 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
   // snprintf(buffer, sizeof(buffer), "result/%s_%.2lf_gates_smp%d.plt",
   //           drug_name, conc, sample_id);
   // fp_gate = fopen(buffer, "w");
-  printf("drug name: %s , concentration: %.2lf , sample id: %d \n", drug_name, conc, sample_id);
+  // printf("drug name: %s , concentration: %.2lf , sample id: %d \n", drug_name, conc, sample_id);
+  printf("\n");
 
-  // fprintf(fp_vm, "%s %s\n", "Time", "Vm");
+  // printf(fp_vm, "%s %s\n", "Time", "Vm");
   //printf("Time: %s Vm: %s\n", "Time", "Vm");
   // fprintf(fp_gate, "Time %s\n", GATES_HEADER); //this is to write headers in results
 
@@ -529,18 +538,19 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 			         STATES,
 		           ALGEBRAIC);
               // cudaDeviceSynchronize();
-    printf("set time step\n");
+    // printf("set time step\n");
+    //printf("timestep pointer: %x \n",d_time_step);
+    //dt_set = *d_time_step;
+    dt_set = 0.0001;
 
-    dt_set = *d_time_step;
-
-    //Compute all rates at tcurr
+    // // //Compute all rates at tcurr
     computeRates<<<1,1>>>(tcurr,
 		          CONSTANTS,
             	RATES,
 		          STATES,
             	ALGEBRAIC);
               // cudaDeviceSynchronize();
-    printf("compute rates\n");
+    // printf("compute rates at tcurr\n");
 
     //Compute the correct/accepted time step
     if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
@@ -552,7 +562,7 @@ __global__ void do_drug_sim_analytical(double conc,double ic50[14],const param_t
 
     //Compute the analytical solution
     solveAnalytical<<<1,1>>>(CONSTANTS, RATES, STATES, ALGEBRAIC, dt);
-    printf("compute rates\n");
+    //printf("solve analytical done\n");
     
     //=============//
     //Print results//
@@ -598,12 +608,9 @@ __global__ void Concentration(drug_t *d_ic50, double *concs[4]){
   // cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
   // cudaMemcpy(h_concs, concs, 4*sizeof(double), cudaMemcpyDeviceToHost);
 
-  printf("concentration: %d -> value: %lf\n",conc_idx, h_concs[conc_idx]);
-  printf("Sample_ID: %d\n",sample_id );
-
-  // for( const auto &it1 : d_ic50[sample_id] ){
-  //       printf("%lf|", it1);
-  //       }
+  // printf("concentration: %d -> value: %lf\n",conc_idx, h_concs[conc_idx]);
+  // printf("Sample_ID: %d\n",sample_id );
+  
   
   //       printf("\n");
         // for( const auto &conc: concs )
@@ -630,12 +637,8 @@ int main()
     double bcl, dt;
     unsigned short pace;
 
-    // variables for I/O
-    FILE* fp_vm;
-    FILE* fp_gate;
-    
     //prepare memory slots for ic_50 
-    cudaMalloc(&d_ic50, sizeof(drug_t));
+    cudaMalloc((void**)&d_ic50, sizeof(drug_t));
     //perpare memory slots for concentration and copy it to the just created mem slots
     cudaMalloc((void**)&d_concs, 4*sizeof(double)); 
     cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice);
@@ -655,6 +658,8 @@ int main()
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
     printf("start calculation....\n");
+    // dim3 block(32,32);
+    //dim3 grid ((columns+block.x-1)/block.x,(rows+block.y-1)/block.y);
     Concentration<<<4,data_row>>>(d_ic50, d_concs );  
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
@@ -701,6 +706,10 @@ void get_IC50_data_from_file(const char* file_name)
       ic50[count][idx] = temp_array[0][idx];
       idx=idx+1;
     } // end data tokenizing
+    for(int sample_index=0; sample_index<idx; sample_index++){
+        printf("%lf|", ic50[count][sample_index]);
+        }
+        printf("\n \n");
     //ic50.push_back(temp_array);
     count = count+1;
   } // end line reading
@@ -709,7 +718,14 @@ void get_IC50_data_from_file(const char* file_name)
 
   //copy the ic50 to GPU memory
   printf("rows found: %d\n",idx);
+  
   cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
+
+  //  printf("device memory sample contents: ");
+  //  for(int sample_index=0; sample_index<idx; sample_index++){
+  //       printf("%lf|", *d_ic50[1][sample_index]);
+  //       }
+  //       printf("\n \n");
 
   //return ic50;
 }
