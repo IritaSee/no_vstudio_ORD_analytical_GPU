@@ -170,6 +170,7 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
   unsigned short pace_steepest = 0;
 
   // apply some cell initialization
+  //initConsts(double celltype, double conc, double *ic50)
   p_cell->initConsts();
   //p_cell->initConsts( celltype, conc, ic50.data());
   p_cell->CONSTANTS[stim_period] = bcl;
@@ -184,7 +185,7 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
 
   fprintf(fp_vm, "%s %s\n", "Time", "Vm");
   fprintf(fp_gate, "Time %s\n", p_cell->GATES_HEADER);
-
+  
   tmax = pace_max * bcl;
 
   while (tcurr < tmax) {
@@ -223,7 +224,9 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
       fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
     }
     fprintf(fp_gate, "\n");
-  
+
+    //printf("tcurr: %lf States[v]: %lf\n", tcurr, p_cell->STATES[V]);
+
     //Next time step
     tcurr = tcurr + dt;
   }
