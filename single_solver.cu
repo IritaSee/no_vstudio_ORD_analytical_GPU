@@ -483,16 +483,21 @@ __device__ drug_t *d_ic50;
 // double ic50[2000][14];
 // double *d_ic50[2000][14];
 
-double *d_concs[4];
+__device__ double *d_concs[4];
 __device__ double *d_time_step;
 
 // __global__ void toc(clock_t start = START_TIMER);
 
 __global__ void check_data(){
-  printf("check data: \n");
+  printf("check sample data: \n");
   int idx = 14;
   for(int sample_index=0; sample_index<idx; sample_index++){
-        printf("%lf|", d_ic50[2][sample_index]);
+        printf("%lf|", &d_ic50[0][sample_index]);
+        }
+  printf("\ncheck conc data: \n");
+  idx = 4;
+  for(int sample_index=0; sample_index<idx; sample_index++){
+        printf("%lf|", d_concs[sample_index][sample_index]);
         }
      //   printf("\n \n");
 }
@@ -790,7 +795,7 @@ const unsigned short sample_id)
     //   fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
     // }
     // fprintf(fp_gate, "\n");
-    printf("\n");
+    //printf("\n");
     
     //Next time step
     tcurr = tcurr + dt;
@@ -858,7 +863,9 @@ int main()
     cudaMalloc((drug_t**)&d_ic50, sizeof(drug_t));
     //perpare memory slots for concentration and copy it to the just created mem slots
     cudaMalloc((void**)&d_concs, 4*sizeof(double)); 
+
     cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice);
+    // cudaStreamSynchronize();
     //prepare memory slots for p_cell and copy it
     // cudaMalloc((void**)d_p_cell, sizeof(Cellmodel));
     // cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
@@ -869,19 +876,25 @@ int main()
     //drug_t ic50 = get_IC50_data_from_file(buffer);
     //int data_row = sizeof(ic50)/sizeof(ic50[0]);
     int data_row = 10;
+    
     get_IC50_data_from_file(buffer);
     if(sizeof(ic50)/sizeof(ic50[0]) == 0)
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
         printf("Too much input! Maximum sample data is 2000!\n");
+  
     printf("start calculation....\n");
     // dim3 block(32,32);
     //dim3 grid ((columns+block.x-1)/block.x,(rows+block.y-1)/block.y);
-    Concentration<<<4,data_row>>>(d_ic50, d_concs );  
+
+    //Concentration<<<4,data_row>>>(d_ic50, d_concs );  
+    
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     cudaDeviceSynchronize();
     toc(START_TIMER);
+    cudaFree(d_ic50);
+    cudaFree(d_concs);
     // loop to do calculation in each data is replaced by this func
     
     // memory cleaning and finalize the program
@@ -935,9 +948,10 @@ void get_IC50_data_from_file(const char* file_name)
 
   //copy the ic50 to GPU memory
   printf("rows found: %d\n",idx);
-  
+
   cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
   cudaDeviceSynchronize();
+  
   check_data<<<1,1>>>();
   //  printf("device memory sample contents: ");
   //  for(int sample_index=0; sample_index<idx; sample_index++){
