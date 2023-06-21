@@ -19,7 +19,7 @@
 clock_t START_TIMER;
 
 char buffer[255];
-double concs [4] = {0.0, 33.0, 66.0, 99.0};
+
 // variables for I/O
 FILE* fp_vm;
 FILE* fp_gate;
@@ -479,28 +479,14 @@ RATES[V] = - (ALGEBRAIC[INa]+ALGEBRAIC[INaL]+ALGEBRAIC[Ito]+ALGEBRAIC[ICaL]+ALGE
 
 
 drug_t ic50;
-__device__ drug_t *d_ic50;
+drug_t *d_ic50;
 // double ic50[2000][14];
 // double *d_ic50[2000][14];
 
-__device__ double *d_concs[4];
+double *d_concs[4];
 __device__ double *d_time_step;
 
 // __global__ void toc(clock_t start = START_TIMER);
-
-__global__ void check_data(){
-  printf("check sample data: \n");
-  int idx = 14;
-  for(int sample_index=0; sample_index<idx; sample_index++){
-        printf("%lf|", &d_ic50[0][sample_index]);
-        }
-  printf("\ncheck conc data: \n");
-  idx = 4;
-  for(int sample_index=0; sample_index<idx; sample_index++){
-        printf("%lf|", d_concs[sample_index][sample_index]);
-        }
-     //   printf("\n \n");
-}
 
 __global__ void set_time_step(
   /*
@@ -857,14 +843,21 @@ int main()
     // input variables for cell simulation
     double bcl, dt;
     unsigned short pace;
-
+    double concs[4] = {0.0, 33.0, 66.0, 99.0};
     //prepare memory slots for ic_50 
     cudaSetDevice(0);
     cudaMalloc((drug_t**)&d_ic50, sizeof(drug_t));
     //perpare memory slots for concentration and copy it to the just created mem slots
-    cudaMalloc((void**)&d_concs, 4*sizeof(double)); 
-
-    cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMalloc((double**)&d_concs, 4*sizeof(double)); 
+    printf("\nstatus: %d\n",cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice));
+    
+    double conc_temp[4];
+    cudaMemcpy(conc_temp, d_concs, 4*sizeof(double), cudaMemcpyDeviceToHost);
+    printf("concentration: \n");
+    for (int z = 0; z<sizeof(conc_temp)/sizeof(double);z++){
+      printf("%lf ",conc_temp[z]);
+    }
+    printf("\n");
     // cudaStreamSynchronize();
     //prepare memory slots for p_cell and copy it
     // cudaMalloc((void**)d_p_cell, sizeof(Cellmodel));
@@ -875,7 +868,6 @@ int main()
       "./drugs/bepridil/IC50_samples10.csv");
     //drug_t ic50 = get_IC50_data_from_file(buffer);
     //int data_row = sizeof(ic50)/sizeof(ic50[0]);
-    int data_row = 10;
     
     get_IC50_data_from_file(buffer);
     if(sizeof(ic50)/sizeof(ic50[0]) == 0)
@@ -891,8 +883,9 @@ int main()
     
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     toc(START_TIMER);
+
     cudaFree(d_ic50);
     cudaFree(d_concs);
     // loop to do calculation in each data is replaced by this func
@@ -936,10 +929,12 @@ void get_IC50_data_from_file(const char* file_name)
       ic50[count][idx] = temp_array[0][idx];
       idx=idx+1;
     } // end data tokenizing
-    for(int sample_index=0; sample_index<idx; sample_index++){
-        printf("%lf|", ic50[count][sample_index]);
-        }
-        printf("\n \n");
+    //check data input in CPU
+    // printf("CPU input: \n");
+    // for(int sample_index=0; sample_index<idx; sample_index++){
+    //     printf("%lf|", ic50[count][sample_index]);
+    //     }
+    //     printf("\n \n");
     //ic50.push_back(temp_array);
     count = count+1;
   } // end line reading
@@ -947,17 +942,19 @@ void get_IC50_data_from_file(const char* file_name)
   fclose(fp_drugs);
 
   //copy the ic50 to GPU memory
-  printf("rows found: %d\n",idx);
+  printf("column found: %d\n",idx);
 
-  cudaMemcpy(d_ic50, ic50, idx * sizeof(drug_t), cudaMemcpyHostToDevice);
-  cudaDeviceSynchronize();
-  
-  check_data<<<1,1>>>();
-  //  printf("device memory sample contents: ");
-  //  for(int sample_index=0; sample_index<idx; sample_index++){
-  //       printf("%lf|", *d_ic50[1][sample_index]);
-  //       }
-  //       printf("\n \n");
+  cudaMemcpy(d_ic50, ic50, sizeof(drug_t), cudaMemcpyHostToDevice);
 
-  //return ic50;
+  // cudaDeviceSynchronize();
+  drug_t sample;
+  cudaMemcpy(sample, d_ic50, sizeof(drug_t), cudaMemcpyDeviceToHost);
+   printf("device memory sample contents: \n");
+   for(int person=0;person<10;person++){
+      for(int sample_index=0; sample_index<idx; sample_index++){
+          printf("%lf|", sample[person][sample_index]);        
+      }
+    printf("\n \n");
+  }
+
 }
