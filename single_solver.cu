@@ -483,7 +483,7 @@ drug_t *d_ic50;
 // double ic50[2000][14];
 // double *d_ic50[2000][14];
 
-double *d_concs[4];
+double *d_concs;
 __device__ double *d_time_step;
 
 // __global__ void toc(clock_t start = START_TIMER);
@@ -836,19 +836,23 @@ __global__ void Concentration(drug_t *d_ic50, double *concs[4]){
 
 }
 
-
+double concs[4];
 int main()
 {
 
     // input variables for cell simulation
     double bcl, dt;
     unsigned short pace;
-    double concs[4] = {0.0, 33.0, 66.0, 99.0};
+    
+    concs[0] = 0.0;
+    concs[1] = 0.33;
+    concs[2] = 0.66;
+    concs[3] = 0.99;
     //prepare memory slots for ic_50 
     cudaSetDevice(0);
     cudaMalloc((drug_t**)&d_ic50, sizeof(drug_t));
     //perpare memory slots for concentration and copy it to the just created mem slots
-    cudaMalloc((double**)&d_concs, 4*sizeof(double)); 
+    printf("malloc status: %d\n",cudaMalloc((void**)&d_concs, 4*sizeof(double))); 
     printf("\nstatus: %d\n",cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice));
     
     double conc_temp[4];
