@@ -41,9 +41,9 @@ void toc(clock_t start)
 }
 
 
-void get_IC50_data_from_file(const char* file_name);
+int get_IC50_data_from_file(const char* file_name);
 
-__global__ void initConsts(double* CONSTANTS, double* RATES, double *STATES){
+__global__ void initConsts(double* CONSTANTS, double* RATES, double* STATES){
 CONSTANTS[celltype] = 0;
 CONSTANTS[R] = 8314;
 CONSTANTS[T] = 310;
@@ -476,69 +476,7 @@ RATES[cajsr] =  ALGEBRAIC[Bcajsr]*(ALGEBRAIC[Jtr] - ALGEBRAIC[Jrel]);
 RATES[V] = - (ALGEBRAIC[INa]+ALGEBRAIC[INaL]+ALGEBRAIC[Ito]+ALGEBRAIC[ICaL]+ALGEBRAIC[ICaNa]+ALGEBRAIC[ICaK]+ALGEBRAIC[IKr]+ALGEBRAIC[IKs]+ALGEBRAIC[IK1]+ALGEBRAIC[INaCa_i]+ALGEBRAIC[INaCa_ss]+ALGEBRAIC[INaK]+ALGEBRAIC[INab]+ALGEBRAIC[IKb]+ALGEBRAIC[IpCa]+ALGEBRAIC[ICab]+ALGEBRAIC[Istim]);
 }
 
-
-
-drug_t ic50;
-drug_t *d_ic50;
-// double ic50[2000][14];
-// double *d_ic50[2000][14];
-
-double *d_concs;
-__device__ double *d_time_step;
-
-// __global__ void toc(clock_t start = START_TIMER);
-
-__global__ void set_time_step(
-  /*
-  as 'adaptive' solver, we need the time step to change in the middle of 
-  the process
-  since we need to change almost every function to void, I change the 
-  return time_step to 
-  cudaMemCopy the time_step, 
-  */
-    double TIME,
-    double time_point,
-    double max_time_step,
-    double* CONSTANTS,
-    double* RATES,
-    double* STATES,
-    double* ALGEBRAIC) {
-    double time_step = 0.005;
-
-    if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
-        //printf("TIME <= time_point ms\n");
-        //return time_step;
-        memcpy(d_time_step, &time_step, sizeof(double));
-        __syncthreads(); //equivalent to break
-        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
-    }
-    else {
-        //printf("TIME > time_point ms\n");
-        if (std::abs(RATES[V] * time_step) <= 0.2) {//Slow changes in V
-            //printf("dV/dt <= 0.2\n");
-            time_step = std::abs(0.8 / RATES[V]);
-            //Make sure time_step is between 0.005 and max_time_step
-            if (time_step < 0.005) {
-                time_step = 0.005;
-            }
-            else if (time_step > max_time_step) {
-                time_step = max_time_step;
-            }
-            //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
-        }
-        else if (std::abs(RATES[V] * time_step) >= 0.8) {//Fast changes in V
-            //printf("dV/dt >= 0.8\n");
-            time_step = std::abs(0.2 / RATES[V]);
-            while (std::abs(RATES[V] * time_step) >= 0.8 && 0.005 < time_step && time_step < max_time_step) {
-                time_step = time_step / 10.0;
-                //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
-            }
-        }
-        // return time_step;
-        memcpy(d_time_step, &time_step, sizeof(double));
-    }
-}
-/*__global__ void solveAnalytical(double dt)
+__global__ void solveAnalytical(double dt, double* CONSTANTS, double* RATES, double* STATES, double* ALGEBRAIC)
 { 
   ////==============
   ////Exact solution
@@ -655,7 +593,70 @@ __global__ void set_time_step(
   //STATES[Jrelnp] = STATES[Jrelnp] + RATES[Jrelnp] * dt;
   //STATES[Jrelp] = STATES[Jrelp] + RATES[Jrelp] * dt;
 }
-*/
+
+
+
+drug_t ic50;
+drug_t *d_ic50;
+// double ic50[2000][14];
+// double *d_ic50[2000][14];
+
+double *d_concs;
+__device__ double *d_time_step;
+
+// __global__ void toc(clock_t start = START_TIMER);
+
+__global__ void set_time_step(
+  /*
+  as 'adaptive' solver, we need the time step to change in the middle of 
+  the process
+  since we need to change almost every function to void, I change the 
+  return time_step to 
+  cudaMemCopy the time_step, 
+  */
+    double TIME,
+    double time_point,
+    double max_time_step,
+    double* CONSTANTS,
+    double* RATES,
+    double* STATES,
+    double* ALGEBRAIC) {
+    double time_step = 0.005;
+
+    if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
+        //printf("TIME <= time_point ms\n");
+        //return time_step;
+        memcpy(d_time_step, &time_step, sizeof(double));
+        __syncthreads(); //equivalent to break
+        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
+    }
+    else {
+        //printf("TIME > time_point ms\n");
+        if (std::abs(RATES[V] * time_step) <= 0.2) {//Slow changes in V
+            //printf("dV/dt <= 0.2\n");
+            time_step = std::abs(0.8 / RATES[V]);
+            //Make sure time_step is between 0.005 and max_time_step
+            if (time_step < 0.005) {
+                time_step = 0.005;
+            }
+            else if (time_step > max_time_step) {
+                time_step = max_time_step;
+            }
+            //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+        }
+        else if (std::abs(RATES[V] * time_step) >= 0.8) {//Fast changes in V
+            //printf("dV/dt >= 0.8\n");
+            time_step = std::abs(0.2 / RATES[V]);
+            while (std::abs(RATES[V] * time_step) >= 0.8 && 0.005 < time_step && time_step < max_time_step) {
+                time_step = time_step / 10.0;
+                //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+            }
+        }
+        
+        memcpy(d_time_step, &time_step, sizeof(double));
+    }
+    // return time_step;
+}
 
 
 __global__ void do_drug_sim_analytical(double conc, drug_t *d_ic50, const param_t* p_param, 
@@ -707,8 +708,9 @@ const unsigned short sample_id)
   ALGEBRAIC = (double*)malloc((num_of_algebraic)*sizeof(double));
 
   // apply some cell initialization
+  printf("init consts \n");
   initConsts<<<1,1>>>(CONSTANTS, RATES, STATES);
-  printf("constants: %lf rates: %lf states: %lf \n",CONSTANTS,RATES,STATES);
+  printf("concentration: %lf constants: %lf rates: %lf states: %lf \n",conc, &CONSTANTS, &RATES, &STATES);
   //p_cell->initConsts( celltype, conc, ic50.data());
   CONSTANTS[stim_period] = bcl;
 
@@ -720,7 +722,7 @@ const unsigned short sample_id)
   //           drug_name, conc, sample_id);
   // fp_gate = fopen(buffer, "w");
   // printf("drug name: %s , concentration: %.2lf , sample id: %d \n", drug_name, conc, sample_id);
-  printf("\n");
+  //printf("\n");
 
   // printf(fp_vm, "%s %s\n", "Time", "Vm");
   //printf("Time: %s Vm: %s\n", "Time", "Vm");
@@ -729,34 +731,30 @@ const unsigned short sample_id)
   tmax = pace_max * bcl;
 
   while (tcurr < tmax) {
-    // dt_set = set_time_step<<<1,1>>>(tcurr,
-    //     		   time_point,
-		//            max_time_step,
-  	// 	         CONSTANTS,
-		//            RATES,
-		// 	         STATES,
-		//            ALGEBRAIC);
-    // set_time_step<<<1,1>>>(tcurr,
-    //     		   time_point,
-		//            max_time_step,
-  	// 	         CONSTANTS,
-		//            RATES,
-		// 	         STATES,
-		//            ALGEBRAIC);
-              // cudaDeviceSynchronize();
-    // printf("set time step\n");
-    //printf("timestep pointer: %x \n",d_time_step);
-    //dt_set = *d_time_step;
+    // ide awalnya mau buat set_time_step sebagai fungsi
+    // biasa yang bisa nge return, kayaknya ga bisa deh
+    // kan fungsi GPU
+    set_time_step<<<1,1>>>(tcurr,
+        		   time_point,
+		           max_time_step,
+  		         CONSTANTS,
+		           RATES,
+			         STATES,
+		           ALGEBRAIC);
+              //cudaDeviceSynchronize();
+    printf("set time step\n");
+    printf("timestep pointer: %x \n",d_time_step);
+    dt_set = *d_time_step;
     dt_set = 0.0001;
 
-    // // //Compute all rates at tcurr
-    // computeRates<<<1,1>>>(tcurr,
-		//           CONSTANTS,
-    //         	RATES,
-		//           STATES,
-    //         	ALGEBRAIC);
-              // cudaDeviceSynchronize();
-    // printf("compute rates at tcurr\n");
+    // //Compute all rates at tcurr
+    computeRates<<<1,1>>>(tcurr,
+		          CONSTANTS,
+            	RATES,
+		          STATES,
+            	ALGEBRAIC);
+              //cudaDeviceSynchronize();
+    printf("compute rates at tcurr\n");
 
     //Compute the correct/accepted time step
     if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
@@ -767,8 +765,11 @@ const unsigned short sample_id)
     }
 
     //Compute the analytical solution
-    //solveAnalytical<<<1,1>>>(dt);
-    //printf("solve analytical done\n");
+    solveAnalytical<<<1,1>>>(dt, CONSTANTS,
+            	RATES,
+		          STATES,
+            	ALGEBRAIC);
+    printf("solve analytical done\n");
     
     //=============//
     //Print results//
@@ -794,7 +795,7 @@ const unsigned short sample_id)
 
 
 //__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
-__global__ void Concentration(drug_t *d_ic50, double *concs[4]){
+__global__ void Concentration(drug_t *d_ic50){
   
   /*
   uses block and thread in CUDA to replace concentration loop
@@ -867,13 +868,13 @@ int main()
     // cudaMalloc((void**)d_p_cell, sizeof(Cellmodel));
     // cudaMemcpy(d_p_cell, p_cell, sizeof(Cellmodel), cudaMemcpyHostToDevice);
     unsigned short idx;
-    tic();
+    // tic(); // start stopwatch 
     snprintf(buffer, sizeof(buffer),
       "./drugs/bepridil/IC50_samples10.csv");
     //drug_t ic50 = get_IC50_data_from_file(buffer);
     //int data_row = sizeof(ic50)/sizeof(ic50[0]);
-    
-    get_IC50_data_from_file(buffer);
+    int data_row;
+    data_row = get_IC50_data_from_file(buffer);
     if(sizeof(ic50)/sizeof(ic50[0]) == 0)
         printf("Something problem with the IC50 file!\n");
     else if(sizeof(ic50)/sizeof(ic50[0]) > 2000)
@@ -883,12 +884,12 @@ int main()
     // dim3 block(32,32);
     //dim3 grid ((columns+block.x-1)/block.x,(rows+block.y-1)/block.y);
 
-    //Concentration<<<4,data_row>>>(d_ic50, d_concs );  
+    Concentration<<<4,data_row>>>(d_ic50);  
     
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     //cudaDeviceSynchronize();
-    toc(START_TIMER);
+    // toc(START_TIMER); // stop stopwatch
 
     cudaFree(d_ic50);
     cudaFree(d_concs);
@@ -900,10 +901,13 @@ int main()
     return 0;
 }
 
-void get_IC50_data_from_file(const char* file_name)
+int get_IC50_data_from_file(const char* file_name)
 {
   /*get IC50 data from a file*/
-  /*caution: keep it host function!*/
+  /*caution: keep it host function!
+  
+  returns how many samples (row) were found
+  */
   FILE *fp_drugs;
   printf("Reading the data....\n");
   
@@ -960,5 +964,5 @@ void get_IC50_data_from_file(const char* file_name)
       }
     printf("\n \n");
   }
-
+  return count;
 }
