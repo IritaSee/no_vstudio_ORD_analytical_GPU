@@ -43,6 +43,13 @@ void toc(clock_t start)
 
 int get_IC50_data_from_file(const char* file_name);
 
+__constant__ int isDebugging = 1;
+
+__shared__ double* RATES;
+__shared__ double* STATES;
+__shared__ double* CONSTANTS;
+__shared__ double* ALGEBRAIC;
+
 __global__ void initConsts(double* CONSTANTS, double* RATES, double* STATES){
 CONSTANTS[celltype] = 0;
 CONSTANTS[R] = 8314;
@@ -627,8 +634,8 @@ __global__ void set_time_step(
         //printf("TIME <= time_point ms\n");
         //return time_step;
         memcpy(d_time_step, &time_step, sizeof(double));
-        __syncthreads(); //equivalent to break
-        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
+        //__syncthreads(); //equivalent to break
+        printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
     }
     else {
         //printf("TIME > time_point ms\n");
@@ -692,10 +699,6 @@ const unsigned short sample_id)
   unsigned short pace_count = 0;
   unsigned short pace_steepest = 0;
 
-  double* RATES;
-  double* STATES;
-  double* CONSTANTS;
-  double* ALGEBRAIC;
 
   int num_of_algebraic = 69;
   int num_of_constants = 46;
@@ -708,9 +711,10 @@ const unsigned short sample_id)
   ALGEBRAIC = (double*)malloc((num_of_algebraic)*sizeof(double));
 
   // apply some cell initialization
-  printf("init consts \n");
+  // if (isDebugging == 1)  printf("init consts \n");
+  // printf("constants: %lf rates: %lf states: %lf \n", CONSTANTS, RATES, STATES);
   initConsts<<<1,1>>>(CONSTANTS, RATES, STATES);
-  printf("concentration: %lf constants: %lf rates: %lf states: %lf \n",conc, &CONSTANTS, &RATES, &STATES);
+  // printf("concentration: %lf constants: %lf rates: %lf states: %lf \n",conc, CONSTANTS, RATES, STATES);
   //p_cell->initConsts( celltype, conc, ic50.data());
   CONSTANTS[stim_period] = bcl;
 
@@ -742,8 +746,11 @@ const unsigned short sample_id)
 			         STATES,
 		           ALGEBRAIC);
               //cudaDeviceSynchronize();
-    printf("set time step\n");
-    printf("timestep pointer: %x \n",d_time_step);
+    // if (isDebugging == 1){
+    //     printf("set time step\n");
+    //     printf("timestep pointer: %x \n",d_time_step);
+    // }
+    
     dt_set = *d_time_step;
     dt_set = 0.0001;
 
@@ -754,7 +761,7 @@ const unsigned short sample_id)
 		          STATES,
             	ALGEBRAIC);
               //cudaDeviceSynchronize();
-    printf("compute rates at tcurr\n");
+    // if (isDebugging == 1) printf("compute rates at tcurr\n");
 
     //Compute the correct/accepted time step
     if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
@@ -769,14 +776,18 @@ const unsigned short sample_id)
             	RATES,
 		          STATES,
             	ALGEBRAIC);
-    printf("solve analytical done\n");
+    // if (isDebugging) {
+    // printf("dt: %lf\n",dt);
+    // printf("solve analytical done\n");
+    // }
+    
     
     //=============//
     //Print results//
     //=============//
     // fprintf(fp_vm, "%lf %lf\n", tcurr, STATES[V]);
     // fprintf(fp_gate, "%lf ",tcurr);
-    //printf("tcurr: %lf States[V]: %lf\n", tcurr, STATES[V]);
+    printf("tcurr: %lf States[V]: %lf\n", tcurr, STATES[V]);
     // printf("%lf \n \n",tcurr);    
     // for(idx = 0; idx < p_cell->gates_size; idx++){
     //   fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
@@ -795,20 +806,20 @@ const unsigned short sample_id)
 
 
 //__global__ void Calculate(double d_ic50[11][14], double concs[4], Cellmodel *p_cell);
-__global__ void Concentration(drug_t *d_ic50){
+__global__ void Concentration(drug_t *d_ic50, double h_concs[]){
   
   /*
   uses block and thread in CUDA to replace concentration loop
   */
 
-  // Get the thread ID.
+  // Get the thread ID. IMPORTANT TO REMEMBER:
   int sample_id = threadIdx.x;
   int conc_idx = blockIdx.x;
   //printf("doing calculation loop....\n");
-  
+  //printf("Sample ID in process: %d\n", sample_id);
 
   //for now, we hard code the concs
-  double h_concs[4] = {0.0, 33.0, 66.0, 99.0};
+  // double h_concs[4] = {0.0, 33.0, 66.0, 99.0};
 
   //memset(h_concs, -1, sizeof(h_concs));
   //printf("%lf", h_concs[1]);
@@ -822,7 +833,7 @@ __global__ void Concentration(drug_t *d_ic50){
   //       printf("\n");
         // for( const auto &conc: concs )
         // { // begin concentration loop
-        // printf("Current Concentration: %lf  ",concs[a]);
+        // printf("Current Concentration: %lf  ",h_concs[a]);
         // // execute main simulation function
         // //do_drug_sim(conc, ic50[sample_id],
         // //            NULL, sample_id,
@@ -855,7 +866,7 @@ int main()
     //perpare memory slots for concentration and copy it to the just created mem slots
     printf("malloc status: %d\n",cudaMalloc((void**)&d_concs, 4*sizeof(double))); 
     printf("\nstatus: %d\n",cudaMemcpy(d_concs, concs, 4*sizeof(double), cudaMemcpyHostToDevice));
-    
+
     double conc_temp[4];
     cudaMemcpy(conc_temp, d_concs, 4*sizeof(double), cudaMemcpyDeviceToHost);
     printf("concentration: \n");
@@ -884,7 +895,8 @@ int main()
     // dim3 block(32,32);
     //dim3 grid ((columns+block.x-1)/block.x,(rows+block.y-1)/block.y);
 
-    Concentration<<<4,data_row>>>(d_ic50);  
+    //Concentration<<<sizeof(d_concs)/sizeof(double),data_row>>>(d_ic50, d_concs);  
+    Concentration<<<4,data_row>>>(d_ic50, d_concs);  
     
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
