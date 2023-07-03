@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include <cuda_runtime.h>
+// #include <cuPrintf.cu>
 
 #include "enums/enum_mar_cell_MKII.cuh"
 
@@ -629,11 +630,11 @@ __global__ void set_time_step(
     double* STATES,
     double* ALGEBRAIC) {
     double time_step = 0.005;
-
+    // printf("Time: %lf time_point: %lf\n",TIME, time_point);
     if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
         //printf("TIME <= time_point ms\n");
         //return time_step;
-        memcpy(d_time_step, &time_step, sizeof(double));
+        printf("d_time step memcpy status: %d\n",memcpy(d_time_step, &time_step, sizeof(double)));
         //__syncthreads(); //equivalent to break
         printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
     }
@@ -660,7 +661,7 @@ __global__ void set_time_step(
             }
         }
         
-        memcpy(d_time_step, &time_step, sizeof(double));
+        printf("d_time step memcpy status: %d\n",memcpy(d_time_step, &time_step, sizeof(double)));
     }
     // return time_step;
 }
@@ -699,6 +700,7 @@ const unsigned short sample_id)
   unsigned short pace_count = 0;
   unsigned short pace_steepest = 0;
 
+  double outputs[36];
 
   int num_of_algebraic = 69;
   int num_of_constants = 46;
@@ -733,7 +735,7 @@ const unsigned short sample_id)
   // fprintf(fp_gate, "Time %s\n", GATES_HEADER); //this is to write headers in results
 
   tmax = pace_max * bcl;
-
+  //printf("tcurr: %lf  tmax: %lf\n", tcurr, tmax);
   while (tcurr < tmax) {
     // ide awalnya mau buat set_time_step sebagai fungsi
     // biasa yang bisa nge return, kayaknya ga bisa deh
@@ -747,9 +749,9 @@ const unsigned short sample_id)
 		           ALGEBRAIC);
               //cudaDeviceSynchronize();
     // if (isDebugging == 1){
-    //     printf("set time step\n");
-    //     printf("timestep pointer: %x \n",d_time_step);
-    // }
+        // printf("set time step\n");
+        // printf("timestep pointer: %ld,  \n",d_time_step);
+    // } // for isDebugging
     
     dt_set = *d_time_step;
     dt_set = 0.0001;
@@ -787,10 +789,12 @@ const unsigned short sample_id)
     //=============//
     // fprintf(fp_vm, "%lf %lf\n", tcurr, STATES[V]);
     // fprintf(fp_gate, "%lf ",tcurr);
-    printf("tcurr: %lf States[V]: %lf\n", tcurr, STATES[V]);
+    //printf("tcurr: %lf, States[V]: %lf\n", tcurr ,STATES[V]);
     // printf("%lf \n \n",tcurr);    
     // for(idx = 0; idx < p_cell->gates_size; idx++){
     //   fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
+    printf("tcurr: %lf, States[V]: %lf\n", tcurr ,STATES[V]);
+    outputs[int(tcurr*10000)] = STATES[V];
     // }
     // fprintf(fp_gate, "\n");
     //printf("\n");
@@ -798,6 +802,7 @@ const unsigned short sample_id)
     //Next time step
     tcurr = tcurr + dt;
   }
+
 
   // clean the memories
   //fclose(fp_vm);
@@ -857,9 +862,9 @@ int main()
     unsigned short pace;
     
     concs[0] = 0.0;
-    concs[1] = 0.33;
-    concs[2] = 0.66;
-    concs[3] = 0.99;
+    concs[1] = 33.0;
+    concs[2] = 66.0;
+    concs[3] = 99.0;
     //prepare memory slots for ic_50 
     cudaSetDevice(0);
     cudaMalloc((drug_t**)&d_ic50, sizeof(drug_t));
@@ -870,7 +875,8 @@ int main()
     double conc_temp[4];
     cudaMemcpy(conc_temp, d_concs, 4*sizeof(double), cudaMemcpyDeviceToHost);
     printf("concentration: \n");
-    for (int z = 0; z<sizeof(conc_temp)/sizeof(double);z++){
+    int conc_size = sizeof(conc_temp)/sizeof(double);
+    for (int z = 0; z<conc_size; z++){
       printf("%lf ",conc_temp[z]);
     }
     printf("\n");
@@ -894,8 +900,10 @@ int main()
     printf("start calculation....\n");
     // dim3 block(32,32);
     //dim3 grid ((columns+block.x-1)/block.x,(rows+block.y-1)/block.y);
+    // int concs_size = sizeof(d_concs)/sizeof(double);
+    // printf("concs_size : %d\n",concs_size);
+    // Concentration<<<concs_size,data_row>>>(d_ic50, d_concs);  
 
-    //Concentration<<<sizeof(d_concs)/sizeof(double),data_row>>>(d_ic50, d_concs);  
     Concentration<<<4,data_row>>>(d_ic50, d_concs);  
     
     // Calculate(d_ic50, d_concs, d_p_cell );
