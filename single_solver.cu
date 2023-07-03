@@ -51,6 +51,8 @@ __shared__ double* STATES;
 __shared__ double* CONSTANTS;
 __shared__ double* ALGEBRAIC;
 
+__shared__ double outputs[36];
+
 __global__ void initConsts(double* CONSTANTS, double* RATES, double* STATES){
 CONSTANTS[celltype] = 0;
 CONSTANTS[R] = 8314;
@@ -690,7 +692,8 @@ const unsigned short sample_id)
   // simulation parameters
   double dtw = 2.0;
   const char *drug_name = "bepridil";
-  const double bcl = 2000;
+  // const double bcl = 2000;
+  const double bcl = 0.001;
   const double inet_vm_threshold = -88.0;
   const unsigned short pace_max = 10;
   const unsigned short celltype = 0.;
@@ -700,7 +703,7 @@ const unsigned short sample_id)
   unsigned short pace_count = 0;
   unsigned short pace_steepest = 0;
 
-  double outputs[36];
+  
 
   int num_of_algebraic = 69;
   int num_of_constants = 46;
@@ -735,6 +738,7 @@ const unsigned short sample_id)
   // fprintf(fp_gate, "Time %s\n", GATES_HEADER); //this is to write headers in results
 
   tmax = pace_max * bcl;
+  // printf("tmax: %lf\n",tmax);
   //printf("tcurr: %lf  tmax: %lf\n", tcurr, tmax);
   while (tcurr < tmax) {
     // ide awalnya mau buat set_time_step sebagai fungsi
@@ -754,7 +758,7 @@ const unsigned short sample_id)
     // } // for isDebugging
     
     dt_set = *d_time_step;
-    dt_set = 0.0001;
+    dt_set = 0.01;
 
     // //Compute all rates at tcurr
     computeRates<<<1,1>>>(tcurr,
@@ -793,8 +797,9 @@ const unsigned short sample_id)
     // printf("%lf \n \n",tcurr);    
     // for(idx = 0; idx < p_cell->gates_size; idx++){
     //   fprintf(fp_gate, "%lf ", p_cell->STATES[p_cell->GATES_INDICES[idx]]);
-    printf("tcurr: %lf, States[V]: %lf\n", tcurr ,STATES[V]);
-    outputs[int(tcurr*10000)] = STATES[V];
+    // printf("Concentration %lf, tcurr: %lf, States[V]: %lf, states*rates %lf\n", conc, tcurr ,STATES[V], (STATES[V] + RATES[V] * tcurr));
+    printf("Concentration %lf, tcurr: %lf, States: %lf\n", conc, tcurr , (STATES[V] + RATES[V] * tcurr) );
+    // outputs[int(tcurr*10000)] = STATES[V];
     // }
     // fprintf(fp_gate, "\n");
     //printf("\n");
@@ -802,7 +807,7 @@ const unsigned short sample_id)
     //Next time step
     tcurr = tcurr + dt;
   }
-
+  
 
   // clean the memories
   //fclose(fp_vm);
@@ -904,8 +909,11 @@ int main()
     // printf("concs_size : %d\n",concs_size);
     // Concentration<<<concs_size,data_row>>>(d_ic50, d_concs);  
 
-    Concentration<<<4,data_row>>>(d_ic50, d_concs);  
-    
+    Concentration<<<1,data_row>>>(d_ic50, d_concs);  
+
+    // for (int te = 0 ; te<36; te++){
+    //   printf("%lf\n",outputs[te]);
+    // }
     // Calculate(d_ic50, d_concs, d_p_cell );
     //concentration loop fails so i loop it altogether
     //cudaDeviceSynchronize();
