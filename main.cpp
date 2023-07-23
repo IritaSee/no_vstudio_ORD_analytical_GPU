@@ -23,7 +23,7 @@ drug_t get_IC50_data_from_file(const char* file_name);
 clock_t tic();
 void toc(clock_t start = START_TIMER);
 void do_drug_sim_analytical(const double conc, std::array<double, 14> ic50, 
-const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell);
+const param_t* p_param, const unsigned short sampl292, Cellmodel *p_cell);
 double set_time_step(double TIME,
     double time_point,
     double max_time_step,
@@ -45,10 +45,11 @@ int main()
 
     unsigned short idx;
 
-    std::array<double, 4> concs = {0.0, 33.0, 66.0, 99.0};
+    // std::array<double, 4> concs = {0.0, 33.0, 66.0, 99.0};
+    std::array<double, 1> concs = {0.0};
 
     snprintf(buffer, sizeof(buffer),
-      "./drugs/bepridil/IC50_samples10.csv");
+      "./drugs/bepridil/IC50_samples1.csv");
     drug_t ic50 = get_IC50_data_from_file(buffer);
     if(ic50.size() == 0)
         printf("Something problem with the IC50 file!\n");
@@ -161,7 +162,7 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
   const char *drug_name = "bepridil";
   const double bcl = 2000;
   const double inet_vm_threshold = -88.0;
-  const unsigned short pace_max = 10;
+  const unsigned short pace_max = 1000;
   const unsigned short celltype = 0.;
   const unsigned short last_pace_print = 3;
   const unsigned short last_drug_check_pace = 250;
@@ -192,10 +193,10 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
     dt_set = set_time_step(tcurr,
         		   time_point,
 		           max_time_step,
-  		           p_cell->CONSTANTS,
-		           p_cell->RATES,
-			   p_cell->STATES,
-		           p_cell->ALGEBRAIC);
+  		          p_cell->CONSTANTS,
+		            p_cell->RATES,
+			          p_cell->STATES,
+		            p_cell->ALGEBRAIC);
 
     //Compute all rates at tcurr
     p_cell->computeRates(tcurr,
@@ -205,6 +206,7 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
             		 p_cell->ALGEBRAIC);
 
     //Compute the correct/accepted time step
+// printf("pas update dt nilai bandingan if nya: %lf dibanding %lf dan verdict %d\n", floor((tcurr + dt_set) / bcl), floor(tcurr / bcl), (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl))  );
     if (floor((tcurr + dt_set) / bcl) == floor(tcurr / bcl)) {
       dt = dt_set;
     }
@@ -225,7 +227,7 @@ const param_t* p_param, const unsigned short sample_id, Cellmodel *p_cell)
     }
     fprintf(fp_gate, "\n");
 
-    //printf("tcurr: %lf States[v]: %lf\n", tcurr, p_cell->STATES[V]);
+    // printf("tcurr: %lf, v: %d, States[v]: %lf\n", tcurr, V, p_cell->STATES[V]);
 
     //Next time step
     tcurr = tcurr + dt;
@@ -247,9 +249,10 @@ double set_time_step(double TIME,
     double time_step = 0.005;
 
     if (TIME <= time_point || (TIME - floor(TIME / CONSTANTS[stim_period]) * CONSTANTS[stim_period]) <= time_point) {
-        //printf("TIME <= time_point ms\n");
+        // printf("TIME <= time_point ms\n");
+          // printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
         return time_step;
-        //printf("dV = %lf, time_step = %lf\n",RATES[V] * time_step, time_step);
+      
     }
     else {
         //printf("TIME > time_point ms\n");
@@ -263,14 +266,14 @@ double set_time_step(double TIME,
             else if (time_step > max_time_step) {
                 time_step = max_time_step;
             }
-            //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+            // printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
         }
         else if (std::abs(RATES[V] * time_step) >= 0.8) {//Fast changes in V
             //printf("dV/dt >= 0.8\n");
             time_step = std::abs(0.2 / RATES[V]);
             while (std::abs(RATES[V] * time_step) >= 0.8 && 0.005 < time_step && time_step < max_time_step) {
                 time_step = time_step / 10.0;
-                //printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
+                // printf("dV = %lf, time_step = %lf\n",std::abs(RATES[V] * time_step), time_step);
             }
         }
         return time_step;
